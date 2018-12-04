@@ -11,7 +11,7 @@ import org.jsoup.nodes.Document;
 
 public class MultithreadingSearch {
     public static void main(String[] args) throws IOException {
-        StartSearch s = new StartSearch(21638597, 200, 50);
+        StartSearch s = new StartSearch(21638597, 200, 10);
     }
 }
 
