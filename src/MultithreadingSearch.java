@@ -11,9 +11,8 @@ import org.jsoup.nodes.Document;
 
 public class MultithreadingSearch {
     public static void main(String[] args) throws IOException {
-        StartSearch s = new StartSearch(21638597, 50, 10);
+        StartSearch s = new StartSearch(21638597, 200, 50);
     }
-
 }
 
 class StartSearch {
@@ -111,7 +110,7 @@ class SearchThread extends Thread {
             try {
                 doc = Jsoup.connect(pattern[0] + current_id).get();
             } catch (IOException e) {
-                System.err.println("IOException!");
+                e.printStackTrace();
                 break;
             }
 
@@ -125,7 +124,7 @@ class SearchThread extends Thread {
             try {
                 doc = Jsoup.connect(pattern[1] + current_id + pattern[2]).ignoreContentType(true).get();
             } catch (IOException e) {
-                System.err.println("IOException!");
+                e.printStackTrace();
                 break;
             }
             getSubUtil(doc.text());
