@@ -31,9 +31,8 @@ class Search {
         recursive_search(q_id, recursion_level);
     }
 
-
     private static List<Integer> getSubUtil(String str) {
-        List<Integer> list = new ArrayList<Integer>();
+        List<Integer> list = new ArrayList<>();
         Pattern pattern = Pattern.compile("\"id\":(.*?),\"title\"");
         Matcher m = pattern.matcher(str);
         while (m.find()) {
