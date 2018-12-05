@@ -24,16 +24,19 @@ import org.apache.lucene.search.*;
 
 public class MultithreadingSearch {
     public static void main(String[] args) throws IOException {
-        Crawler crawler = new Crawler();
-        crawler.init("C:/index");
-        crawler.setThreadSize(10);
-        crawler.setBufferSize(200);
-        crawler.crawl();
+        // TODO: 加一个GUI模块，点击对应的按键执行相应的功能
+        Crawler crawler = new Crawler("C:/index");
+        crawler.init();
+        crawler.setThreadSize(20);
+        crawler.setBufferSize(5000);
+        //crawler.crawl();
+        crawler.search("美国");
     }
 }
 
 class Crawler {
     // parameters to control crawling scale
+    private String file_path;
     private int max_threads;
     private int max_questions;
 
@@ -55,7 +58,10 @@ class Crawler {
     };
 
     // initialize waiting queue
-    public void init(String file_path) {
+    public void init() {
+        // read finished set data from file
+        // TODO: 爬取过的ID应该保存到文件中
+
         // initialize waiting queue
         Document doc;
         try {
@@ -77,7 +83,7 @@ class Crawler {
 //        waiting_queue.add(544061865);
 
         // initialize index writer
-        File file = new File(file_path);
+        File file = new File(this.file_path);
         try {
             Directory dir = FSDirectory.open(file);
             Analyzer analyzer = new IKAnalyzer();
@@ -129,9 +135,6 @@ class Crawler {
         }
 
         // create search thread
-//        for (int i = 0; i < max_threads; i++) {
-//            new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set, indexWriter);
-//        }
         ExecutorService threads = Executors.newFixedThreadPool(max_threads);
         for (int i = 0; i < max_threads; i++) {
             threads.execute(new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set, indexWriter));
@@ -155,13 +158,36 @@ class Crawler {
         }
     }
 
-    Crawler() {
+    public void search(String queryStr) {
+        File f = new File(this.file_path);
+        try {
+            IndexSearcher searcher = new IndexSearcher(DirectoryReader.open(FSDirectory.open(f)));
+            Analyzer analyzer = new IKAnalyzer();
+            QueryParser parser = new QueryParser(Version.LUCENE_4_10_4, "question", analyzer);
+            Query query = parser.parse(queryStr);
+            TopDocs hits = searcher.search(query, 100);
+            for (ScoreDoc doc : hits.scoreDocs) {
+                org.apache.lucene.document.Document d = searcher.doc(doc.doc);
+                System.out.println(d.get("question"));
+                System.out.println(d.get("answer1"));
+                System.out.println(d.get("answer2"));
+                System.out.println("-----------------------------------------");
+            }
+        } catch (IOException | ParseException e) {
+            e.printStackTrace();
+        }
+    }
+    
+
+    Crawler(String file_path) {
         // initialize object
+        this.file_path = file_path;
         this.max_questions = 100;
         this.max_threads = 1;
         waiting_queue = new LinkedList<>();
         finished_set = new HashSet<>();
     }
+
 }
 
 
