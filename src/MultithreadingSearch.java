@@ -9,13 +9,35 @@ import java.io.IOException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
+import org.apache.lucene.analysis.*;
+import org.apache.lucene.document.*;
+import org.apache.lucene.index.*;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.*;
+import org.apache.lucene.store.*;
+import org.apache.lucene.util.*;
+import org.wltea.analyzer.lucene.*;
+
 public class MultithreadingSearch {
     public static void main(String[] args) throws IOException {
-        StartSearch s = new StartSearch(21638597, 200, 10);
+        Crawler crawler = new Crawler();
+        crawler.setThread(10);
+        crawler.setBuffer(100);
+        crawler.addRoot(304118539);
+
+        crawler.crawl();
+        //crawler.index();
+
+
     }
 }
 
-class StartSearch {
+class Crawler {
+    // parameters to control crawling scale
+    private int max_threads;
+    private int max_questions;
+
     // object to store data info
     private LinkedList<Integer> waiting_queue;
     private HashSet<Integer> finished_set;
@@ -31,24 +53,66 @@ class StartSearch {
                     "div.QuestionHeader-content > div.QuestionHeader-main > h1"
     };
 
-    StartSearch(int root, int max_questions, int max_threads) {
+    // initialize waiting queue
+    public void init(){
 
-        // initialize object
-        waiting_queue = new LinkedList<>();
-        finished_set = new HashSet<>();
+    }
 
+    // set the number of crawling thread
+    public boolean setThread(int max_threads) {
+        if (max_threads > 0) {
+            this.max_threads = max_threads;
+            return true;
+        }
+        return false;
+    }
+
+    // set the number of questions
+    public boolean setBuffer(int max_questions) {
+        if (max_questions > this.max_questions) {
+            this.max_questions = max_questions;
+            return true;
+        }
+        return false;
+    }
+
+
+    // add the root question
+    public boolean addRoot(int root) {
+        // if root question had been searched, return false
+        if (finished_set.contains(root)) {
+            return false;
+        }
         // add the first id into the pool
         waiting_queue.add(root);
+        return true;
+    }
 
-        for (int i = 0; i < max_threads; i++) {
-            new SearchThread(i, max_questions, pattern, waiting_queue, finished_set);
+    // start to crawl website
+    public void crawl() {
+        // if no item in waiting queue, return
+        if (waiting_queue.isEmpty()) {
+            System.out.println("No specific root question given!");
+            return;
         }
 
+        // create search thread
+        for (int i = 0; i < max_threads; i++) {
+            new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set);
+        }
+    }
+
+    Crawler() {
+        // initialize object
+        this.max_questions = 100;
+        this.max_threads = 1;
+        waiting_queue = new LinkedList<>();
+        finished_set = new HashSet<>();
     }
 }
 
 
-class SearchThread extends Thread {
+class CrawlerThread extends Thread {
     // identifier
     private int id;
     private int max_questions;
@@ -61,8 +125,8 @@ class SearchThread extends Thread {
     // list to store temporary data
     private List<Integer> list;
 
-    SearchThread(int thread_id, int max_questions, String[] pattern, LinkedList<Integer> waiting_queue,
-                 HashSet<Integer> finished_set) {
+    CrawlerThread(int thread_id, int max_questions, String[] pattern, LinkedList<Integer> waiting_queue,
+                  HashSet<Integer> finished_set) {
         // binding reference
         this.id = thread_id;
         this.max_questions = max_questions;
@@ -77,7 +141,7 @@ class SearchThread extends Thread {
         start();
     }
 
-    private void getSubUtil(String str) {
+    private void parseSimilarText(String str) {
         list.clear();
         Pattern pattern = Pattern.compile("\"id\":(.*?),\"title\"");
         Matcher m = pattern.matcher(str);
@@ -117,7 +181,7 @@ class SearchThread extends Thread {
             // print the question
             System.out.println("Thread " + id + " " + "(" + current_id + "): " + doc.select(pattern[5]).text());
 
-            // reserved for extract answer
+            // reserved for extract two answers
             // TODO: create index for <key = Q, value = A>
 
             // find more questions
@@ -127,7 +191,7 @@ class SearchThread extends Thread {
                 e.printStackTrace();
                 break;
             }
-            getSubUtil(doc.text());
+            parseSimilarText(doc.text());
 
             // add new item to pool
             for (int similar_id : list) {
@@ -143,4 +207,8 @@ class SearchThread extends Thread {
             }
         }
     }
+}
+
+class IndexerThread extends Thread{
+
 }

@@ -10,11 +10,11 @@ import org.jsoup.nodes.Document;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        Search s = new Search(304118539, 20);
+        RecursiveSearch s = new RecursiveSearch(304118539, 20);
     }
 }
 
-class Search {
+class RecursiveSearch {
     private HashSet<Integer> set;
     private Hashtable<Integer, Integer> Set;
 
@@ -25,7 +25,7 @@ class Search {
     private static String selector_pattern2 = ") > div > div.RichContent.RichContent--unescapable > div.RichContent-inner";
     private static String question_selector = "#root > div > main > div > div:nth-child(11) > div.QuestionHeader > div.QuestionHeader-content > div.QuestionHeader-main > h1";
 
-    public Search(int q_id, int recursion_level) throws IOException {
+    public RecursiveSearch(int q_id, int recursion_level) throws IOException {
         set = new HashSet<>();
         Set = new Hashtable<>();
         recursive_search(q_id, recursion_level);
