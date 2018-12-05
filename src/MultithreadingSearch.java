@@ -1,4 +1,4 @@
-import java.io.File;
+import java.io.*;
 import java.util.*;
 import java.util.List;
 import java.util.ArrayList;
@@ -28,9 +28,10 @@ public class MultithreadingSearch {
         Crawler crawler = new Crawler("C:/index");
         crawler.init();
         crawler.setThreadSize(20);
-        crawler.setBufferSize(5000);
-        //crawler.crawl();
-        crawler.search("美国");
+        crawler.setBufferSize(1000);
+        crawler.crawl();
+        crawler.search("浙江");
+        crawler.exit();
     }
 }
 
@@ -61,6 +62,19 @@ class Crawler {
     public void init() {
         // read finished set data from file
         // TODO: 爬取过的ID应该保存到文件中
+        File saved_ID = new File(file_path + "/saved_ID.dat");
+        if (saved_ID.exists()) {
+            System.out.println("Exist!");
+            try {
+                int value;
+                FileInputStream input = new FileInputStream(saved_ID);
+                while ((value = input.read()) != -1) {
+                    finished_set.add(value);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
         // initialize waiting queue
         Document doc;
@@ -83,7 +97,7 @@ class Crawler {
 //        waiting_queue.add(544061865);
 
         // initialize index writer
-        File file = new File(this.file_path);
+        File file = new File(this.file_path + "/index");
         try {
             Directory dir = FSDirectory.open(file);
             Analyzer analyzer = new IKAnalyzer();
@@ -92,9 +106,20 @@ class Crawler {
 
         } catch (IOException e) {
             e.printStackTrace();
-            return;
         }
 
+    }
+
+    public void exit() {
+        File saved_ID = new File(file_path + "/saved_ID.dat");
+        try {
+            FileOutputStream output = new FileOutputStream(saved_ID);
+            for (int i : finished_set) {
+                output.write(i);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // set the number of crawling thread
@@ -159,8 +184,9 @@ class Crawler {
     }
 
     public void search(String queryStr) {
-        File f = new File(this.file_path);
+        File f = new File(this.file_path + "/index");
         try {
+            //if (f.exists()) {
             IndexSearcher searcher = new IndexSearcher(DirectoryReader.open(FSDirectory.open(f)));
             Analyzer analyzer = new IKAnalyzer();
             QueryParser parser = new QueryParser(Version.LUCENE_4_10_4, "question", analyzer);
@@ -173,11 +199,12 @@ class Crawler {
                 System.out.println(d.get("answer2"));
                 System.out.println("-----------------------------------------");
             }
+            //}
         } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
     }
-    
+
 
     Crawler(String file_path) {
         // initialize object
