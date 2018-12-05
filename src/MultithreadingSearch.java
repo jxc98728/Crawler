@@ -67,8 +67,8 @@ class Crawler {
             System.out.println("Exist!");
             try {
                 int value;
-                FileInputStream input = new FileInputStream(saved_ID);
-                while ((value = input.read()) != -1) {
+                ObjectInputStream input = new ObjectInputStream(new FileInputStream(saved_ID));
+                while ((value = input.readInt()) != -1) {
                     finished_set.add(value);
                 }
             } catch (IOException e) {
@@ -113,9 +113,9 @@ class Crawler {
     public void exit() {
         File saved_ID = new File(file_path + "/saved_ID.dat");
         try {
-            FileOutputStream output = new FileOutputStream(saved_ID);
+            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(saved_ID));
             for (int i : finished_set) {
-                output.write(i);
+                output.writeInt(i);
             }
         } catch (IOException e) {
             e.printStackTrace();
