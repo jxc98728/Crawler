@@ -27,8 +27,8 @@ public class MultithreadingSearch {
         // TODO: 加一个GUI模块，点击对应的按键执行相应的功能
         Crawler crawler = new Crawler("C:/index");
         crawler.init();
-        crawler.setThreadSize(20);
-        crawler.setBufferSize(1000);
+        crawler.setThreadSize(5);
+        crawler.setBufferSize(20);
         crawler.crawl();
         crawler.search("浙江");
         crawler.exit();
@@ -64,16 +64,14 @@ class Crawler {
         // TODO: 爬取过的ID应该保存到文件中
         File saved_ID = new File(file_path + "/saved_ID.dat");
         if (saved_ID.exists()) {
-            System.out.println("Exist!");
             try {
-                int value;
-                ObjectInputStream input = new ObjectInputStream(new FileInputStream(saved_ID));
-                while ((value = input.readInt()) != -1) {
-                    finished_set.add(value);
-                }
-            } catch (IOException e) {
+                ObjectInputStream input = new ObjectInputStream(new FileInputStream(file_path + "/saved_ID.dat"));
+                finished_set = (HashSet<Integer>) (input.readObject());
+            } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
+        } else {
+            finished_set = new HashSet<>();
         }
 
         // initialize waiting queue
@@ -111,12 +109,9 @@ class Crawler {
     }
 
     public void exit() {
-        File saved_ID = new File(file_path + "/saved_ID.dat");
         try {
-            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(saved_ID));
-            for (int i : finished_set) {
-                output.writeInt(i);
-            }
+            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(file_path + "/saved_ID.dat"));
+            output.writeObject(finished_set);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -209,14 +204,11 @@ class Crawler {
     Crawler(String file_path) {
         // initialize object
         this.file_path = file_path;
-        this.max_questions = 100;
+        this.max_questions = 10;
         this.max_threads = 1;
         waiting_queue = new LinkedList<>();
-        finished_set = new HashSet<>();
     }
-
 }
-
 
 class CrawlerThread extends Thread {
     // identifier
