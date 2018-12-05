@@ -1,8 +1,10 @@
+import java.io.File;
 import java.util.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.*;
 
 import java.io.IOException;
 
@@ -12,24 +14,21 @@ import org.jsoup.nodes.Document;
 import org.apache.lucene.analysis.*;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.*;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.*;
 import org.wltea.analyzer.lucene.*;
 
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.*;
+
 public class MultithreadingSearch {
     public static void main(String[] args) throws IOException {
         Crawler crawler = new Crawler();
-        crawler.setThread(10);
-        crawler.setBuffer(100);
-        crawler.addRoot(304118539);
-
+        crawler.init("C:/index");
+        crawler.setThreadSize(10);
+        crawler.setBufferSize(200);
         crawler.crawl();
-        //crawler.index();
-
-
     }
 }
 
@@ -38,7 +37,9 @@ class Crawler {
     private int max_threads;
     private int max_questions;
 
+
     // object to store data info
+    private IndexWriter indexWriter;
     private LinkedList<Integer> waiting_queue;
     private HashSet<Integer> finished_set;
 
@@ -48,18 +49,50 @@ class Crawler {
             "https://www.zhihu.com/api/v4/questions/",
             "/similar-questions?include=data%5B*%5D.answer_count%2Cauthor%2Cfollower_count&limit=5",
             "#QuestionAnswers-answers > div > div > div:nth-child(2) > div > div:nth-child(",
-            ") > div > div.RichContent.RichContent--unescapable > div.RichContent-inner",
+            ") > div > div.RichContent.RichContent--unescapable > div.RichContent-inner > span",
             "#root > div > main > div > div:nth-child(11) > div.QuestionHeader > " +
                     "div.QuestionHeader-content > div.QuestionHeader-main > h1"
     };
 
     // initialize waiting queue
-    public void init(){
+    public void init(String file_path) {
+        // initialize waiting queue
+        Document doc;
+        try {
+            doc = Jsoup.connect("https://www.zhihu.com/explore").get();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+        Pattern pattern = Pattern.compile("link\" href=\"/question/(.*?)/answer");
+        Matcher m = pattern.matcher(doc.toString());
+        while (m.find()) {
+            waiting_queue.add(Integer.parseInt(m.group(1)));
+        }
+        // insert ID manually
+//        waiting_queue.add(304439740);
+//        waiting_queue.add(304357397);
+//        waiting_queue.add(544258238);
+//        waiting_queue.add(544165647);
+//        waiting_queue.add(544061865);
+
+        // initialize index writer
+        File file = new File(file_path);
+        try {
+            Directory dir = FSDirectory.open(file);
+            Analyzer analyzer = new IKAnalyzer();
+            IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_4_10_4, analyzer);
+            indexWriter = new IndexWriter(dir, config);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
     }
 
     // set the number of crawling thread
-    public boolean setThread(int max_threads) {
+    public boolean setThreadSize(int max_threads) {
         if (max_threads > 0) {
             this.max_threads = max_threads;
             return true;
@@ -68,7 +101,7 @@ class Crawler {
     }
 
     // set the number of questions
-    public boolean setBuffer(int max_questions) {
+    public boolean setBufferSize(int max_questions) {
         if (max_questions > this.max_questions) {
             this.max_questions = max_questions;
             return true;
@@ -76,9 +109,8 @@ class Crawler {
         return false;
     }
 
-
-    // add the root question
-    public boolean addRoot(int root) {
+    // add the question ID
+    public boolean addID(int root) {
         // if root question had been searched, return false
         if (finished_set.contains(root)) {
             return false;
@@ -97,8 +129,29 @@ class Crawler {
         }
 
         // create search thread
+//        for (int i = 0; i < max_threads; i++) {
+//            new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set, indexWriter);
+//        }
+        ExecutorService threads = Executors.newFixedThreadPool(max_threads);
         for (int i = 0; i < max_threads; i++) {
-            new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set);
+            threads.execute(new CrawlerThread(i, max_questions, pattern, waiting_queue, finished_set, indexWriter));
+        }
+        threads.shutdown();
+        while (true) {
+            if (threads.isTerminated()) {
+                System.out.println("All threads exit.");
+                try {
+                    indexWriter.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -121,18 +174,20 @@ class CrawlerThread extends Thread {
     private String[] pattern;
     private LinkedList<Integer> waiting_queue;
     private HashSet<Integer> finished_set;
+    private IndexWriter indexWriter;
 
     // list to store temporary data
     private List<Integer> list;
 
     CrawlerThread(int thread_id, int max_questions, String[] pattern, LinkedList<Integer> waiting_queue,
-                  HashSet<Integer> finished_set) {
+                  HashSet<Integer> finished_set, IndexWriter indexWriter) {
         // binding reference
         this.id = thread_id;
         this.max_questions = max_questions;
         this.pattern = pattern;
         this.waiting_queue = waiting_queue;
         this.finished_set = finished_set;
+        this.indexWriter = indexWriter;
 
         // initialize object
         this.list = new ArrayList<>();
@@ -154,6 +209,8 @@ class CrawlerThread extends Thread {
     public void run() {
         int current_id;
         Document doc;
+        org.apache.lucene.document.Document record;
+        Field f1, f2, f3;
         while (true) {
             synchronized (finished_set) {
                 if (finished_set.size() == max_questions)
@@ -178,11 +235,25 @@ class CrawlerThread extends Thread {
                 break;
             }
 
-            // print the question
-            System.out.println("Thread " + id + " " + "(" + current_id + "): " + doc.select(pattern[5]).text());
+            // create a record
+            record = new org.apache.lucene.document.Document();
 
-            // reserved for extract two answers
-            // TODO: create index for <key = Q, value = A>
+            // print the question
+            // extract two answers
+            System.out.println("Thread " + id + " " + "(" + current_id + "): " + doc.select(pattern[5]).text());
+            f1 = new TextField("question", doc.select(pattern[5]).text(), Field.Store.YES);
+            f2 = new TextField("answer1", doc.select(pattern[3] + "1" + pattern[4]).text(), Field.Store.YES);
+            f3 = new TextField("answer2", doc.select(pattern[3] + "2" + pattern[4]).text(), Field.Store.YES);
+            record.add(f1);
+            record.add(f2);
+            record.add(f3);
+            synchronized (indexWriter) {
+                try {
+                    indexWriter.addDocument(record);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             // find more questions
             try {
@@ -207,8 +278,4 @@ class CrawlerThread extends Thread {
             }
         }
     }
-}
-
-class IndexerThread extends Thread{
-
 }

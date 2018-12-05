@@ -44,9 +44,9 @@ public class LuceneTest {
 
     public Document getDocument1() {
         Document doc = new Document();
-        Field f1 = new TextField("question", "如何提高代码水平", Field.Store.YES);
-        Field f2 = new TextField("answer1", "梵高是一名画家", Field.Store.YES);
-        Field f3 = new TextField("answer2", "GPA 1.5", Field.Store.YES);
+        Field f1 = new TextField("question", "浙江大学在国内什么水平", Field.Store.YES);
+        Field f2 = new TextField("answer1", "辣鸡三本", Field.Store.YES);
+        Field f3 = new TextField("answer2", "毁我青春", Field.Store.YES);
         doc.add(f1);
         doc.add(f2);
         doc.add(f3);
@@ -57,8 +57,8 @@ public class LuceneTest {
     public Document getDocument2() {
         Document doc = new Document();
         Field f1 = new TextField("question", "如何提高编程水平？", Field.Store.YES);
-        Field f2 = new TextField("answer1", "谢邀", Field.Store.YES);
-        Field f3 = new TextField("answer2", "让我来回答这个问题", Field.Store.YES);
+        Field f2 = new TextField("answer1", "谢邀......", Field.Store.YES);
+        Field f3 = new TextField("answer2", "让我来回答这个问题......", Field.Store.YES);
         doc.add(f1);
         doc.add(f2);
         doc.add(f3);
@@ -70,7 +70,7 @@ public class LuceneTest {
         File f = new File(filePath);
         try {
             IndexSearcher searcher = new IndexSearcher(DirectoryReader.open(FSDirectory.open(f)));
-            String queryStr = "水平";
+            String queryStr = "望远镜";
             Analyzer analyzer = new IKAnalyzer();
             //指定field为“name”，Lucene会按照关键词搜索每个doc中的name。
             QueryParser parser = new QueryParser(Version.LUCENE_4_10_4, "question", analyzer);
@@ -78,8 +78,10 @@ public class LuceneTest {
             TopDocs hits = searcher.search(query, 100);//前面几行代码也是固定套路，使用时直接改field和关键词即可
             for (ScoreDoc doc : hits.scoreDocs) {
                 Document d = searcher.doc(doc.doc);
+                System.out.println(d.get("question"));
                 System.out.println(d.get("answer1"));
                 System.out.println(d.get("answer2"));
+                System.out.println("-----------------------------------------");
             }
         } catch (IOException | ParseException e) {
             e.printStackTrace();
